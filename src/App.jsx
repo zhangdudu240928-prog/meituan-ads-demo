@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import MerchantLogin from './components/MerchantLogin';
 import TierSelector from './components/TierSelector';
 import ScenarioGrid from './components/ScenarioGrid';
 import ChatWindow from './components/ChatWindow';
@@ -22,33 +23,47 @@ function MobileTab({ active, onClick, icon, label }) {
 }
 
 export default function App() {
+  const [merchant, setMerchant] = useState(null); // null = 未登录
   const [tier, setTier] = useState('KA');
   const [scenario, setScenario] = useState(null);
-  const [step, setStep] = useState(1); // 1=选层级 2=选场景 3=对话
+  const [step, setStep] = useState(1); // 1=选场景 2=对话
   const [mobileTab, setMobileTab] = useState('chat'); // chat | data | scenes
 
   const { messages, isLoading, sendMessage, reset } = useChat({ tier, scenario });
 
-  function handleTierSelect(t) {
-    setTier(t);
-    if (step < 2) setStep(2);
+  function handleLogin(m) {
+    setMerchant(m);
+    setTier(m.tier); // 登录后自动设定层级，不再需要手动选
+    setStep(1);
   }
 
   function handleScenarioSelect(s) {
     setScenario(s);
     reset();
-    setStep(3);
+    setStep(2);
     setMobileTab('chat');
   }
 
   function handleReset() {
     reset();
     setScenario(null);
-    setStep(2);
+    setStep(1);
+  }
+
+  function handleLogout() {
+    setMerchant(null);
+    setScenario(null);
+    reset();
+    setStep(1);
   }
 
   const tierMeta = CLIENT_TIERS[tier];
   const scenarioMeta = SCENARIOS.find((s) => s.id === scenario);
+
+  // 未登录时渲染登录页
+  if (!merchant) {
+    return <MerchantLogin onLogin={handleLogin} />;
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -64,21 +79,24 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {tier && (
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0"
-              style={{ backgroundColor: tierMeta.color }}
-            >
-              {tierMeta.badge}
-            </span>
-          )}
+          {/* 商家品牌名 */}
+          <span className="text-xs text-gray-600 font-medium hidden sm:block">{merchant.brand}</span>
+          {/* 层级 badge */}
+          <span
+            className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0"
+            style={{ backgroundColor: tierMeta.color }}
+          >
+            {tierMeta.badge}
+          </span>
+          {/* 当前场景 */}
           {scenarioMeta && (
             <span className="text-xs text-gray-500 items-center gap-1 hidden sm:flex">
               <span>{scenarioMeta.icon}</span>
               <span>{scenarioMeta.title}</span>
             </span>
           )}
-          {step === 3 && (
+          {/* 返回场景选择 */}
+          {step === 2 && (
             <button
               onClick={handleReset}
               className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1 hover:bg-gray-50 transition-colors flex-shrink-0"
@@ -87,42 +105,62 @@ export default function App() {
               <span className="sm:hidden">← 返回</span>
             </button>
           )}
+          {/* 退出登录 */}
+          <button
+            onClick={handleLogout}
+            className="text-xs text-gray-300 hover:text-gray-500 border border-gray-100 rounded-lg px-2.5 py-1 hover:bg-gray-50 transition-colors flex-shrink-0"
+          >
+            退出
+          </button>
         </div>
       </header>
 
       {/* ── 主体内容 ── */}
       <main className="flex-1 overflow-hidden">
 
-        {/* Step 1 & 2：选层级 + 选场景 */}
-        {step < 3 && (
+        {/* Step 1：选场景 */}
+        {step === 1 && (
           <div className="h-full overflow-y-auto">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
-              {/* Step 1 */}
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4">
+              {/* 层级说明卡片 */}
+              <div
+                className="rounded-xl border px-4 py-3 flex items-center gap-3"
+                style={{ backgroundColor: tierMeta.bgColor, borderColor: tierMeta.borderColor }}
+              >
+                <span
+                  className="text-xs font-bold px-2.5 py-1 rounded-full text-white flex-shrink-0"
+                  style={{ backgroundColor: tierMeta.color }}
+                >
+                  {tierMeta.badge}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">{tierMeta.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{tierMeta.desc}</p>
+                </div>
+                <div className="hidden sm:flex gap-2 ml-auto flex-wrap justify-end">
+                  {tierMeta.features.map((f) => (
+                    <span key={f} className="text-xs bg-white border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-500 whitespace-nowrap">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 选场景 */}
               <section>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
                   <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">1</div>
-                  <h2 className="text-sm sm:text-base font-semibold text-gray-800">选择您的客户层级</h2>
+                  <h2 className="text-sm sm:text-base font-semibold text-gray-800">选择投放场景</h2>
+                  <span className="text-xs text-gray-400 hidden sm:inline">选择后进入 AI 策略对话</span>
                 </div>
-                <TierSelector selected={tier} onSelect={handleTierSelect} />
+                <ScenarioGrid selected={scenario} tier={tier} onSelect={handleScenarioSelect} />
               </section>
-
-              {/* Step 2 */}
-              {step >= 2 && (
-                <section>
-                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                    <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">2</div>
-                    <h2 className="text-sm sm:text-base font-semibold text-gray-800">选择投放场景</h2>
-                    <span className="text-xs text-gray-400 hidden sm:inline">选择后进入 AI 策略对话</span>
-                  </div>
-                  <ScenarioGrid selected={scenario} tier={tier} onSelect={handleScenarioSelect} />
-                </section>
-              )}
             </div>
           </div>
         )}
 
-        {/* Step 3：对话 + 数据面板 */}
-        {step === 3 && (
+        {/* Step 2：对话 + 数据面板 */}
+        {step === 2 && (
           <>
             {/* 桌面端：三栏布局 */}
             <div className="hidden sm:flex h-full">
